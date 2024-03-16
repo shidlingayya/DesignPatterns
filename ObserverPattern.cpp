@@ -1,103 +1,131 @@
 #include <iostream>
-#include <list>
-#include <string>
-
-class IObserver {
-public:
-    virtual ~IObserver() {};
-    virtual void Update(const std::string& message_from_subject) = 0;
-};
-
-class ISubject {
-public:
-    virtual ~ISubject() {};
-    virtual void Attach(IObserver* observer) = 0;
-    virtual void Detach(IObserver* observer) = 0;
-    virtual void Notify() = 0;
-};
+#include <vector>
 
 /**
- * The Subject owns some important state and notifies observers when the state
- * changes.
+ * Interface for the Observer
  */
+class Observer {
 
-class Subject : public ISubject {
 public:
-    virtual ~Subject() {
+
+    /**
+     * Update the state of this observer
+     * @param temp new temperaure, humidity new humidity and pressure new pressure
+     */
+    virtual void update(float temp, float humidity, float pressure) = 0;
+
+};
+
+class Subject {
+
+public:
+
+    /**
+     * Register an observer
+     * @param observer the observer object to be registered
+     */
+    virtual void registerObserver(Observer* observer) = 0;
+
+    /**
+     * Unregister an observer
+     * @param observer the observer object to be unregistered
+     */
+    virtual void removeObserver(Observer* observer) = 0;
+
+    /**
+     * Notify all the registered observers when a change happens
+     */
+    virtual void notifyObservers() = 0;
+
+};
+
+class WeatherData : public Subject {
+    std::vector<Observer*> observers;
+
+    float temp = 0.0f;
+    float humidity = 0.0f;
+    float pressure = 0.0f;
+
+public:
+
+    void registerObserver(Observer* observer) override
+    {
+        observers.push_back(observer);
     }
 
-    void Attach(IObserver* observer) override {
-        list_observer_.push_back(observer);
-    }
-    void Detach(IObserver* observer) override {
-        list_observer_.remove(observer);
-    }
-    void Notify() override {
-        std::list<IObserver*>::iterator iterator = list_observer_.begin();
-        HowManyObserver();
-        while (iterator != list_observer_.end()) {
-            (*iterator)->Update(message_);
-            ++iterator;
+    void removeObserver(Observer* observer) override
+    {
+        auto iterator = std::find(observers.begin(), observers.end(), observer);
+
+        if (iterator != observers.end()) { // observer found
+            observers.erase(iterator); // remove the observer
         }
     }
 
-    void CreateMessage(std::string message = "Empty") {
-        this->message_ = message;
-        Notify();
-    }
-    void HowManyObserver() {
-        std::cout << "There are " << list_observer_.size() << " observers in the list.\n";
-    }
-
-   void SomeBusinessLogic() {
-        this->message_ = "change message message";
-        Notify();
-        std::cout << "I'm about to do some thing important\n";
+    void notifyObservers() override
+    {
+        for (Observer* observer : observers) { // notify all observers
+            observer->update(temp, humidity, pressure);
+        }
     }
 
-private:
-    std::list<IObserver*> list_observer_;
-    std::string message_;
+    /**
+     * Set the new state of the weather station
+     * @param temp new temperature
+     * @param humidity new humidity
+     * @param pressure new pressure
+     */
+    void setState(float temp, float humidity, float pressure)
+    {
+        this->temp = temp;
+        this->humidity = humidity;
+        this->pressure = pressure;
+        std::cout << std::endl;
+        notifyObservers();
+    }
 };
 
-class Observer : public IObserver {
+class Client : public Observer {
+
+    int id;
+
 public:
-    Observer(Subject& subject) : subject_(subject) {
-        this->subject_.Attach(this);
-        std::cout << "Hi, I'm the Observer \"" << ++Observer::static_number_ << "\".\n";
-        this->number_ = Observer::static_number_;
-    }
-    void Update(const std::string& msg) override {
-        message = msg;
-        std::cout << "Observer \"" << this->number_ << "\": a new message is available --> " << this->message << "\n";
-    }
-    void RemoveMeFromTheList() {
-        subject_.Detach(this);
-        std::cout << "Observer \"" << number_ << "\" removed from the list.\n";
+
+    Client(int id)
+    {
+        this->id = id;
     }
 
-    virtual ~Observer() {
-        std::cout << "Goodbye, I was the Observer \"" << this->number_ << "\".\n";
+    virtual void update(float temp, float humidity, float pressure) override
+    {
+        // print the changed values
+        std::cout << "---Client (" << id << ") Data---\tTemperature: " << temp
+            << "\tHumidity: " << humidity
+            << "\tPressure: " << pressure
+            << std::endl;
     }
-
-private:
-    std::string message;
-    Subject& subject_;
-    static int static_number_;
-    int number_;
 };
-
-int Observer::static_number_ = 0;
 
 int main() {
-    Subject* subject = new Subject;
-    Observer* observer1 = new Observer(*subject);
-    Observer* observer2 = new Observer(*subject);
+    WeatherData weatherStation;
+    Client one(1), two(2), three(3);
 
-    subject->CreateMessage("Hello World! :D");
-    observer2->RemoveMeFromTheList();
-    delete observer2;
-    delete observer1;
-    delete subject;
+    float temp, humidity, pressure;
+
+    weatherStation.registerObserver(&one);
+    weatherStation.registerObserver(&two);
+    weatherStation.registerObserver(&three);
+
+    std::cout << "Enter Temperature, Humidity, Pressure (seperated by spaces) << ";
+    std::cin >> temp >> humidity >> pressure;
+
+    weatherStation.setState(temp, humidity, pressure);
+
+    weatherStation.removeObserver(&two);
+
+    std::cout << "\n\nEnter Temperature, Humidity, Pressure (seperated by spaces) << ";
+    std::cin >> temp >> humidity >> pressure;
+
+    weatherStation.setState(temp, humidity, pressure);
     return 0;
 }
